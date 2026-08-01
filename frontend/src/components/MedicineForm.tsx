@@ -14,6 +14,7 @@ interface Props {
     perBox: number;
     dailyDosage: number;
     unit: string;
+    cycle: 'daily' | 'weekly';
   }) => Promise<void> | void;
   onDelete?: () => void;
 }
@@ -23,7 +24,8 @@ export default function MedicineForm({ visible, mode, medicine, onClose, onSubmi
   const [stock, setStock] = useState('0');
   const [perBox, setPerBox] = useState('0');
   const [dailyDosage, setDailyDosage] = useState('0');
-  const [unit, setUnit] = useState('粒');
+  const [unit, setUnit] = useState('片');
+  const [cycle, setCycle] = useState<'daily' | 'weekly'>('daily');
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -49,13 +51,15 @@ export default function MedicineForm({ visible, mode, medicine, onClose, onSubmi
         setStock(String(medicine.stock));
         setPerBox(String(medicine.perBox));
         setDailyDosage(String(medicine.dailyDosage));
-        setUnit(medicine.unit || '粒');
+        setUnit(medicine.unit || '片');
+        setCycle(medicine.cycle === 'weekly' ? 'weekly' : 'daily');
       } else {
         setName('');
         setStock('0');
         setPerBox('0');
         setDailyDosage('0');
-        setUnit('粒');
+        setUnit('片');
+        setCycle('daily');
       }
     }
   }, [visible, mode, medicine]);
@@ -74,7 +78,7 @@ export default function MedicineForm({ visible, mode, medicine, onClose, onSubmi
     }
     setLoading(true);
     try {
-      await onSubmit({ name: name.trim(), stock: s, perBox: p, dailyDosage: d, unit });
+      await onSubmit({ name: name.trim(), stock: s, perBox: p, dailyDosage: d, unit, cycle });
       onClose();
     } catch (e: any) {
       alert(e?.response?.data?.message || '操作失败');
@@ -82,6 +86,8 @@ export default function MedicineForm({ visible, mode, medicine, onClose, onSubmi
       setLoading(false);
     }
   };
+
+  const dosageLabel = cycle === 'weekly' ? `每周用量(${unit})` : `每日用量(${unit})`;
 
   return (
     <Modal visible={visible} title={mode === 'add' ? '新增药品' : '编辑药品'} onClose={onClose}>
@@ -108,7 +114,18 @@ export default function MedicineForm({ visible, mode, medicine, onClose, onSubmi
         <input type="number" value={perBox} onChange={(e) => setPerBox(e.target.value)} placeholder="0" />
       </div>
       <div className="form-item">
-        <label>每日用量({unit})</label>
+        <label>周期</label>
+        <select
+          className="form-select"
+          value={cycle}
+          onChange={(e) => setCycle(e.target.value as 'daily' | 'weekly')}
+        >
+          <option value="daily">每日</option>
+          <option value="weekly">每周</option>
+        </select>
+      </div>
+      <div className="form-item">
+        <label>{dosageLabel}</label>
         <input type="number" value={dailyDosage} onChange={(e) => setDailyDosage(e.target.value)} placeholder="0" />
       </div>
       <div className="actions">

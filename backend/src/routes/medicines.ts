@@ -12,6 +12,7 @@ interface Medicine {
   per_box: number;
   daily_dosage: number;
   unit: string;
+  cycle: 'daily' | 'weekly';
   sort: number;
   created_at: string;
   updated_at: string;
@@ -25,6 +26,7 @@ function toViewModel(row: Medicine) {
     perBox: row.per_box,
     dailyDosage: row.daily_dosage,
     unit: row.unit,
+    cycle: (row.cycle === 'weekly' ? 'weekly' : 'daily') as 'daily' | 'weekly',
     sort: row.sort,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -39,12 +41,13 @@ router.get('/', authMiddleware, (req, res) => {
 });
 
 router.post('/', authMiddleware, (req, res) => {
-  const { name, stock, perBox, dailyDosage, unit } = req.body as {
+  const { name, stock, perBox, dailyDosage, unit, cycle } = req.body as {
     name?: string;
     stock?: number;
     perBox?: number;
     dailyDosage?: number;
     unit?: string;
+    cycle?: 'daily' | 'weekly';
   };
   if (!name || name.trim().length === 0) {
     res.status(400).json({ code: 400, message: '药品名称不能为空' });
@@ -53,7 +56,8 @@ router.post('/', authMiddleware, (req, res) => {
   const s = Number(stock) || 0;
   const p = Number(perBox) || 0;
   const d = Number(dailyDosage) || 0;
-  const u = unit?.trim() || '粒';
+  const u = unit?.trim() || '片';
+  const c: 'daily' | 'weekly' = cycle === 'weekly' ? 'weekly' : 'daily';
   if (s < 0 || p < 0 || d < 0) {
     res.status(400).json({ code: 400, message: '数量不能为负数' });
     return;
@@ -63,9 +67,9 @@ router.post('/', authMiddleware, (req, res) => {
     .get(req.user!.userId) as { max_sort: number };
   const info = db
     .prepare(
-      'INSERT INTO medicines (user_id, name, stock, per_box, daily_dosage, unit, sort) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO medicines (user_id, name, stock, per_box, daily_dosage, unit, cycle, sort) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    .run(req.user!.userId, name.trim(), s, p, d, u, maxSort.max_sort + 1);
+    .run(req.user!.userId, name.trim(), s, p, d, u, c, maxSort.max_sort + 1);
   const id = Number(info.lastInsertRowid);
   const row = db.prepare('SELECT * FROM medicines WHERE id = ?').get(id) as unknown as Medicine;
   res.json({ code: 0, data: toViewModel(row) });
@@ -77,12 +81,13 @@ router.put('/:id', authMiddleware, (req, res) => {
     res.status(400).json({ code: 400, message: '无效的ID' });
     return;
   }
-  const { name, stock, perBox, dailyDosage, unit } = req.body as {
+  const { name, stock, perBox, dailyDosage, unit, cycle } = req.body as {
     name?: string;
     stock?: number;
     perBox?: number;
     dailyDosage?: number;
     unit?: string;
+    cycle?: 'daily' | 'weekly';
   };
   const existing = db.prepare('SELECT * FROM medicines WHERE id = ? AND user_id = ?').get(id, req.user!.userId) as unknown as Medicine | undefined;
   if (!existing) {
@@ -98,13 +103,14 @@ router.put('/:id', authMiddleware, (req, res) => {
   const p = perBox !== undefined ? Number(perBox) : existing.per_box;
   const d = dailyDosage !== undefined ? Number(dailyDosage) : existing.daily_dosage;
   const u = unit !== undefined ? (unit.trim() || existing.unit) : existing.unit;
+  const c: 'daily' | 'weekly' = cycle !== undefined ? (cycle === 'weekly' ? 'weekly' : 'daily') : (existing.cycle === 'weekly' ? 'weekly' : 'daily');
   if (s < 0 || p < 0 || d < 0) {
     res.status(400).json({ code: 400, message: '数量不能为负数' });
     return;
   }
   db.prepare(
-    `UPDATE medicines SET name = ?, stock = ?, per_box = ?, daily_dosage = ?, unit = ?, updated_at = datetime('now','localtime') WHERE id = ? AND user_id = ?`
-  ).run(newName, s, p, d, u, id, req.user!.userId);
+    `UPDATE medicines SET name = ?, stock = ?, per_box = ?, daily_dosage = ?, unit = ?, cycle = ?, updated_at = datetime('now','localtime') WHERE id = ? AND user_id = ?`
+  ).run(newName, s, p, d, u, c, id, req.user!.userId);
   const row = db.prepare('SELECT * FROM medicines WHERE id = ?').get(id) as unknown as Medicine;
   res.json({ code: 0, data: toViewModel(row) });
 });

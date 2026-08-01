@@ -467,3 +467,93 @@ input, button {
   opacity: 0.85;
   margin-top: 4px;
 }
+
+/* 登录标题 */
+.login-title {
+  padding: 60px 16px 10px;
+  text-align: center;
+}
+
+.login-title-text {
+  font-size: 26px;
+  font-weight: 700;
+  color: #4f8cff;
+  letter-spacing: 2px;
+}
+
+/* 首页周期标签 */
+.med-cycle-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4f8cff;
+  background: #eaf2ff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  transform: translateY(-2px);
+}
+
+/* 配药时间卡片 */
+.hv-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.hv-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.hv-date {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
+.hv-week {
+  font-size: 13px;
+  color: #999;
+}
+
+.hv-del {
+  font-size: 14px;
+  color: #ff5b5b;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #fff1f1;
+  cursor: pointer;
+}
+
+/* 右下角悬浮新增按钮 */
+.fab {
+  position: fixed;
+  right: 18px;
+  bottom: 88px; /* 避开底部 tabbar（~56px）+ 额外间距 */
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #4f8cff;
+  color: #fff;
+  font-size: 26px;
+  line-height: 46px;
+  text-align: center;
+  border: none;
+  box-shadow: 0 6px 18px rgba(79, 140, 255, 0.35);
+  cursor: pointer;
+  z-index: 20;
+}
+.fab:active {
+  transform: scale(0.96);
+}
+
+

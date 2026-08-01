@@ -88,8 +88,12 @@ export default function Profile() {
             <span className="label">药品排序</span>
             <span className="value">›</span>
           </div>
+          <div className="list-item" onClick={() => nav('/manual-stock-updates')}>
+            <span className="label">库存手动更新</span>
+            <span className="value">›</span>
+          </div>
           <div className="list-item" onClick={() => nav('/stock-records')}>
-            <span className="label">库存更新记录</span>
+            <span className="label">库存自动更新记录</span>
             <span className="value">›</span>
           </div>
           <div className="list-item" onClick={() => nav('/units')}>
@@ -109,6 +113,10 @@ export default function Profile() {
             <span className="value">
               {user?.stopBackfillDate || '未设置'} ›
             </span>
+          </div>
+          <div className="list-item" onClick={() => nav('/hospital-visits')}>
+            <span className="label">配药时间</span>
+            <span className="value">›</span>
           </div>
         </div>
 

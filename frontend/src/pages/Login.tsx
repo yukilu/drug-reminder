@@ -37,7 +37,10 @@ export default function Login() {
   return (
     <div className="app">
       <div className="page">
-        <div className="card" style={{ marginTop: 60 }}>
+        <div className="login-title">
+          <div className="login-title-text">用药提醒</div>
+        </div>
+        <div className="card" style={{ marginTop: 20 }}>
           <div className="form-item">
             <label>用户名</label>
             <input
