@@ -166,16 +166,6 @@ export default function Home() {
     fetchList();
   }, [fetchList]);
 
-  useEffect(() => {
-    const handler = () => {
-      setFormMode('add');
-      setCurrent(null);
-      setFormVisible(true);
-    };
-    window.addEventListener('open-add-medicine', handler);
-    return () => window.removeEventListener('open-add-medicine', handler);
-  }, []);
-
   const handleTouchStart = (e: React.TouchEvent) => {
     if (refreshing) return;
     const scrollTop = pageRef.current?.scrollTop ?? 0;
@@ -283,7 +273,7 @@ export default function Home() {
         {loading && list.length === 0 ? (
           <div className="empty">加载中...</div>
         ) : list.length === 0 ? (
-          <div className="empty">还没有药品，点击下方 + 号添加</div>
+          <div className="empty">还没有药品，点击右下角 + 号添加</div>
         ) : (
           <div style={{ padding: '10px 12px' }}>
             {list.map((med) => {
@@ -329,6 +319,13 @@ export default function Home() {
             })}
           </div>
         )}
+        <button className="fab" onClick={() => {
+          setFormMode('add');
+          setCurrent(null);
+          setFormVisible(true);
+        }} title="新增药品">
+          +
+        </button>
       </div>
       <MedicineForm
         visible={formVisible}

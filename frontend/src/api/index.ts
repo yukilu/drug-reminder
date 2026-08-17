@@ -64,15 +64,17 @@ export async function moveMedicine(id: number, direction: 'up' | 'down') {
   return request.post<unknown, ApiResp<void>>(`/medicines/${id}/move`, { direction });
 }
 
-export async function getStockRecords(page = 1, size = 20) {
+export async function getStockRecords(page = 1, size = 20, date?: string) {
+  const dateParam = date ? `&date=${date}` : '';
   return request.get<unknown, ApiResp<{ list: StockRecord[]; total: number; page: number; size: number }>>(
-    `/stock-records?page=${page}&size=${size}`
+    `/stock-records?page=${page}&size=${size}${dateParam}`
   );
 }
 
-export async function getManualStockRecords(page = 1, size = 20) {
+export async function getManualStockRecords(page = 1, size = 20, date?: string) {
+  const dateParam = date ? `&date=${date}` : '';
   return request.get<unknown, ApiResp<{ list: StockRecord[]; total: number; page: number; size: number }>>(
-    `/stock-records/manual?page=${page}&size=${size}`
+    `/stock-records/manual?page=${page}&size=${size}${dateParam}`
   );
 }
 
@@ -122,5 +124,24 @@ export async function createHospitalVisit(visitDate: string) {
 
 export async function deleteHospitalVisit(id: number) {
   return request.delete<unknown, ApiResp<void>>(`/hospital-visits/${id}`);
+}
+
+export async function getReplenishPreview() {
+  return request.get<unknown, ApiResp<{
+    nextDispensingDate: string | null;
+    nextNextDate: string | null;
+    periodDays: number | null;
+    items: Array<{
+      medicineId: number;
+      medicineName: string;
+      pills: number;
+      boxes: number;
+      unit: string;
+      currentStock: number;
+      perBox: number;
+      cycle: 'daily' | 'weekly';
+      dailyDosage: number;
+    }>;
+  }>>('/hospital-visits/replenish-preview');
 }
 

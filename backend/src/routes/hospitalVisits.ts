@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { getReplenishPreview } from '../stockService.js';
 
 const router = Router();
 
@@ -40,6 +41,14 @@ router.get('/next-cycle-days', authMiddleware, (req, res) => {
   const d2 = new Date(rows[1].visit_date);
   const days = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000));
   res.json({ code: 0, data: { days, next1: rows[0].visit_date, next2: rows[1].visit_date } });
+});
+
+/**
+ * 配药补货预览：返回下一次配药日及各药品的预计补货量。
+ */
+router.get('/replenish-preview', authMiddleware, (req, res) => {
+  const data = getReplenishPreview(req.user!.userId);
+  res.json({ code: 0, data });
 });
 
 router.post('/', authMiddleware, (req, res) => {

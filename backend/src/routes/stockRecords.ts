@@ -11,29 +11,33 @@ import {
 const router = Router();
 
 const AUTO_SOURCES = ['daily', 'weekly', '补更'];
-const MANUAL_SOURCES = ['manual'];
+const MANUAL_SOURCES = ['manual', '配药补货'];
 
 /**
  * 「库存自动更新记录」：返回 daily/weekly/补更来源的记录（分页）
+ * 可选 query: date=YYYY-MM-DD 按日期精确过滤
  */
 router.get('/', authMiddleware, (req, res) => {
   const page = Math.max(1, Number((req.query as { page?: string }).page) || 1);
   const size = Math.min(100, Math.max(1, Number((req.query as { size?: string }).size) || 20));
+  const date = (req.query as { date?: string }).date || undefined;
   const offset = (page - 1) * size;
-  const list = getUserStockRecords(req.user!.userId, size, offset, AUTO_SOURCES);
-  const total = countUserStockRecords(req.user!.userId, AUTO_SOURCES);
+  const list = getUserStockRecords(req.user!.userId, size, offset, AUTO_SOURCES, date);
+  const total = countUserStockRecords(req.user!.userId, AUTO_SOURCES, date);
   res.json({ code: 0, data: { list, total, page, size } });
 });
 
 /**
- * 「库存手动更新记录」：返回 source=manual 的记录（分页）
+ * 「库存手动更新记录」：返回 source=manual 或 配药补货 的记录（分页）
+ * 可选 query: date=YYYY-MM-DD 按日期精确过滤
  */
 router.get('/manual', authMiddleware, (req, res) => {
   const page = Math.max(1, Number((req.query as { page?: string }).page) || 1);
   const size = Math.min(100, Math.max(1, Number((req.query as { size?: string }).size) || 20));
+  const date = (req.query as { date?: string }).date || undefined;
   const offset = (page - 1) * size;
-  const list = getUserStockRecords(req.user!.userId, size, offset, MANUAL_SOURCES);
-  const total = countUserStockRecords(req.user!.userId, MANUAL_SOURCES);
+  const list = getUserStockRecords(req.user!.userId, size, offset, MANUAL_SOURCES, date);
+  const total = countUserStockRecords(req.user!.userId, MANUAL_SOURCES, date);
   res.json({ code: 0, data: { list, total, page, size } });
 });
 

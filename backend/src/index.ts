@@ -11,7 +11,7 @@ import medicineRoutes from './routes/medicines.js';
 import stockRecordRoutes from './routes/stockRecords.js';
 import unitRoutes from './routes/units.js';
 import hospitalVisitRoutes from './routes/hospitalVisits.js';
-import { updateAllStocksForDate, backfillRecentDays, todayStr, updateWeeklyStocksForWeekOfDate, backfillRecentWeeks } from './stockService.js';
+import { updateAllStocksForDate, backfillRecentDays, todayStr, updateWeeklyStocksForWeekOfDate, backfillRecentWeeks, replenishAfterDispensingDay } from './stockService.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
 const PORT = Number(process.env.PORT) || (isDev ? 3001 : 80);
@@ -67,6 +67,11 @@ cron.schedule('0 0 0 * * *', () => {
     const dateStr = `${y}-${m}-${d}`;
     const count = updateAllStocksForDate(dateStr, 'daily');
     console.log(`[cron daily ${dateStr}] 更新了 ${count} 个药品库存`);
+    // 配药补货：检查昨天是否为配药日，若是则自动补货
+    const replenishCount = replenishAfterDispensingDay();
+    if (replenishCount > 0) {
+      console.log(`[cron replenish] 配药补货 ${replenishCount} 条记录`);
+    }
   } catch (e) {
     console.error('[cron daily] 每日库存更新失败:', e);
   }

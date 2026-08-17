@@ -28,6 +28,7 @@ export interface StockRecord {
   recordDate: string;
   source: string;
   cycle: 'daily' | 'weekly';
+  perBox?: number;
   createdAt: string;
 }
 

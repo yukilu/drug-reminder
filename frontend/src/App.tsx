@@ -4,12 +4,12 @@ import { ToastProvider } from './contexts/ToastContext';
 import TabBar from './components/TabBar';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
+import Stock from './pages/Stock';
+import Dispensing from './pages/Dispensing';
 import StockRecords from './pages/StockRecords';
-import ManualStockUpdates from './pages/ManualStockUpdates';
 import Units from './pages/Units';
 import MedicineSort from './pages/MedicineSort';
 import StopBackfillDate from './pages/StopBackfillDate';
-import HospitalVisits from './pages/HospitalVisits';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { ReactNode } from 'react';
@@ -28,13 +28,13 @@ function MainLayout() {
     <div className="app">
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/stock" element={<Stock />} />
+        <Route path="/dispensing" element={<Dispensing />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/stock-records" element={<StockRecords />} />
-        <Route path="/manual-stock-updates" element={<ManualStockUpdates />} />
         <Route path="/units" element={<Units />} />
         <Route path="/medicine-sort" element={<MedicineSort />} />
         <Route path="/stop-backfill-date" element={<StopBackfillDate />} />
-        <Route path="/hospital-visits" element={<HospitalVisits />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <TabBar />

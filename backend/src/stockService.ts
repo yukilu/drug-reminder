@@ -181,18 +181,23 @@ export function backfillRecentWeeksForUser(userId: number, weeks: number): numbe
 /**
  * 查询某用户的库存更新记录（分页，按日期倒序）。
  * sourceFilter：可选，仅返回指定来源的记录（不传则返回所有自动/补更来源，用于"自动更新记录"页）
+ * dateFilter：可选，按 record_date 精确过滤（YYYY-MM-DD）
  */
-export function getUserStockRecords(userId: number, limit = 50, offset = 0, sourceFilter?: string[]) {
+export function getUserStockRecords(userId: number, limit = 50, offset = 0, sourceFilter?: string[], dateFilter?: string) {
   const whereParts: string[] = ['sr.user_id = ?'];
   const params: any[] = [userId];
   if (sourceFilter && sourceFilter.length > 0) {
     whereParts.push(`sr.source IN (${sourceFilter.map(() => '?').join(',')})`);
     params.push(...sourceFilter);
   }
+  if (dateFilter) {
+    whereParts.push('sr.record_date = ?');
+    params.push(dateFilter);
+  }
   params.push(limit, offset);
   const rows = db
     .prepare(
-      `SELECT sr.*, m.name as medicine_name
+      `SELECT sr.*, m.name as medicine_name, m.per_box as medicine_per_box
        FROM stock_records sr
        LEFT JOIN medicines m ON m.id = sr.medicine_id
        WHERE ${whereParts.join(' AND ')}
@@ -204,6 +209,7 @@ export function getUserStockRecords(userId: number, limit = 50, offset = 0, sour
     user_id: number;
     medicine_id: number;
     medicine_name: string;
+    medicine_per_box: number;
     before_stock: number;
     after_stock: number;
     change_amount: number;
@@ -222,19 +228,25 @@ export function getUserStockRecords(userId: number, limit = 50, offset = 0, sour
     recordDate: r.record_date,
     source: r.source,
     cycle: r.cycle || 'daily',
+    perBox: r.medicine_per_box || 0,
     createdAt: r.created_at,
   }));
 }
 
 /**
  * 分页统计某用户库存记录数。
+ * dateFilter：可选，按 record_date 精确过滤（YYYY-MM-DD）
  */
-export function countUserStockRecords(userId: number, sourceFilter?: string[]): number {
+export function countUserStockRecords(userId: number, sourceFilter?: string[], dateFilter?: string): number {
   const whereParts: string[] = ['user_id = ?'];
   const params: any[] = [userId];
   if (sourceFilter && sourceFilter.length > 0) {
     whereParts.push(`source IN (${sourceFilter.map(() => '?').join(',')})`);
     params.push(...sourceFilter);
+  }
+  if (dateFilter) {
+    whereParts.push('record_date = ?');
+    params.push(dateFilter);
   }
   const row = db.prepare(`SELECT COUNT(*) as cnt FROM stock_records WHERE ${whereParts.join(' AND ')}`)
     .get(...params) as { cnt: number };
@@ -304,6 +316,187 @@ export function manualUpdateStock(userId: number, medicineId: number, quantityBo
     try { db.exec('ROLLBACK'); } catch { /* ignore */ }
     throw e;
   }
+}
+
+// ==================== 配药补货 ====================
+
+/**
+ * 计算单个药品在配药后需补的量（粒数）。
+ * dispensingDate: 刚过去的配药日期
+ * nextVisitDate: 下一次配药日期（若没有则返回0）
+ * currentStock: 当前库存（已扣减当天用量后）
+ */
+function calcReplenishPills(
+  med: Medicine,
+  dispensingDate: string,
+  nextVisitDate: string | null
+): { pills: number; boxes: number } {
+  if (!nextVisitDate) return { pills: 0, boxes: 0 };
+  const isWeekly = med.cycle === 'weekly';
+  const dosage = med.daily_dosage;
+  if (dosage <= 0) return { pills: 0, boxes: 0 };
+
+  const periodDays = Math.max(1, daysBetween(dispensingDate, nextVisitDate));
+
+  // 周期内需要的总量
+  let requiredForPeriod: number;
+  if (isWeekly) {
+    requiredForPeriod = Math.max(0, Math.ceil(periodDays / 7)) * dosage;
+  } else {
+    requiredForPeriod = periodDays * dosage;
+  }
+
+  // 需补 = 周期需要 - 当前已有库存
+  const pills = Math.max(0, requiredForPeriod - med.stock);
+  const boxes = med.per_box > 0 ? Math.ceil(pills / med.per_box) : 0;
+  return { pills, boxes };
+}
+
+function daysBetween(a: string, b: string): number {
+  const d1 = new Date(a + 'T00:00:00');
+  const d2 = new Date(b + 'T00:00:00');
+  return Math.round((d2.getTime() - d1.getTime()) / 86400000);
+}
+
+/**
+ * 在每日0点扣减后调用：检查昨天是否为配药日，若是则自动补货。
+ * recordDate 记为今天（补货执行日），source='配药补货'。
+ * 返回补货的记录条数。
+ */
+export function replenishAfterDispensingDay(): number {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayStr = formatDate(yesterday);
+  const todayStr = formatDate(today);
+
+  // 找到昨天有配药记录的用户
+  const users = db
+    .prepare('SELECT DISTINCT user_id FROM hospital_visits WHERE visit_date = ?')
+    .all(yesterdayStr) as Array<{ user_id: number }>;
+
+  let total = 0;
+  for (const u of users) {
+    total += replenishForUser(u.user_id, yesterdayStr, todayStr);
+  }
+  return total;
+}
+
+/**
+ * 对单个用户执行配药补货。
+ * dispensingDate: 配药日（昨天）
+ * recordDate: 记录日期（今天）
+ */
+function replenishForUser(userId: number, dispensingDate: string, recordDate: string): number {
+  // 找到配药日之后的下一次配药日期
+  const nextVisit = db
+    .prepare('SELECT visit_date FROM hospital_visits WHERE user_id = ? AND visit_date > ? ORDER BY visit_date ASC LIMIT 1')
+    .get(userId, dispensingDate) as { visit_date: string } | undefined;
+
+  const nextVisitDate = nextVisit?.visit_date || null;
+
+  const meds = db
+    .prepare('SELECT * FROM medicines WHERE user_id = ?')
+    .all(userId) as Medicine[];
+
+  let count = 0;
+  for (const med of meds) {
+    if (med.daily_dosage <= 0) continue;
+
+    // 防止重复补货：同药品同日期同source已存在则跳过
+    const exists = db
+      .prepare('SELECT id FROM stock_records WHERE medicine_id = ? AND record_date = ? AND source = ?')
+      .get(med.id, recordDate, '配药补货') as { id: number } | undefined;
+    if (exists) continue;
+
+    const { pills } = calcReplenishPills(med, dispensingDate, nextVisitDate);
+    if (pills <= 0) continue;
+
+    const before = med.stock;
+    const after = before + pills;
+
+    try {
+      db.exec('BEGIN');
+      db.prepare('UPDATE medicines SET stock = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?').run(
+        after,
+        med.id
+      );
+      db.prepare(
+        `INSERT INTO stock_records (user_id, medicine_id, before_stock, after_stock, change_amount, record_date, source, cycle)
+         VALUES (?, ?, ?, ?, ?, ?, '配药补货', ?)`
+      ).run(userId, med.id, before, after, pills, recordDate, med.cycle || 'daily');
+      db.exec('COMMIT');
+      count++;
+    } catch {
+      try { db.exec('ROLLBACK'); } catch { /* ignore */ }
+    }
+  }
+  return count;
+}
+
+/**
+ * 预览下一次配药日的补货情况（供前端展示）。
+ * 返回下一次配药日期、下一次配药后的补货预览。
+ */
+export function getReplenishPreview(userId: number): {
+  nextDispensingDate: string | null;
+  nextNextDate: string | null;
+  periodDays: number | null;
+  items: Array<{
+    medicineId: number;
+    medicineName: string;
+    pills: number;
+    boxes: number;
+    unit: string;
+    currentStock: number;
+    perBox: number;
+    cycle: 'daily' | 'weekly';
+    dailyDosage: number;
+  }>;
+} {
+  const today = formatDate(new Date());
+
+  // 找到今天及之后的配药日期
+  const visits = db
+    .prepare('SELECT visit_date FROM hospital_visits WHERE user_id = ? AND visit_date >= ? ORDER BY visit_date ASC LIMIT 2')
+    .all(userId, today) as Array<{ visit_date: string }>;
+
+  if (visits.length === 0) {
+    return { nextDispensingDate: null, nextNextDate: null, periodDays: null, items: [] };
+  }
+
+  const nextDispensingDate = visits[0].visit_date;
+  const nextNextDate = visits[1]?.visit_date || null;
+
+  let periodDays: number | null = null;
+  if (nextNextDate) {
+    periodDays = Math.max(1, daysBetween(nextDispensingDate, nextNextDate));
+  }
+
+  // 预览：以配药日的"次日"为执行日，计算每个药品的补货量
+  const meds = db
+    .prepare('SELECT * FROM medicines WHERE user_id = ?')
+    .all(userId) as Medicine[];
+
+  const items = meds
+    .filter((m) => m.daily_dosage > 0)
+    .map((med) => {
+      const { pills, boxes } = calcReplenishPills(med, nextDispensingDate, nextNextDate);
+      return {
+        medicineId: med.id,
+        medicineName: med.name,
+        pills,
+        boxes,
+        unit: med.unit || '片',
+        currentStock: med.stock,
+        perBox: med.per_box,
+        cycle: (med.cycle === 'weekly' ? 'weekly' : 'daily') as 'daily' | 'weekly',
+        dailyDosage: med.daily_dosage,
+      };
+    })
+    .filter((m) => m.pills > 0);
+
+  return { nextDispensingDate, nextNextDate, periodDays, items };
 }
 
 export { weekMondayOf };
